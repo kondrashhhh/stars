@@ -7,8 +7,13 @@ const PORT = process.env.PORT
 app.use(express.json())
 
 app.post("/stars", (req, res) => {
-    res.json(req)
-    console.log(req)
+    // Не возвращаем весь объект `req` — в нём есть циклические структуры (socket, parser)
+    // Отправляем только безопасные части запроса
+    const safe = {
+        body: req.body
+    }
+
+    console.log('ЗАКАЗ', safe);
 })
 
 app.listen(PORT, () => {
