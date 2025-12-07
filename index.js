@@ -88,7 +88,7 @@ app.post("/stars", async (req, res) => {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
-                        'Authorization': process.env.TOKEN,
+                        'Authorization': `JWT ${process.env.TOKEN}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
