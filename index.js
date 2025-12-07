@@ -44,23 +44,8 @@ function makeKeyForParams(body){
 
 app.get('/', (req, res) => res.send('OK'));
 
-// Receive pre-payment parameters (product + options)
-app.post('/params', async (req, res) => {
-    const body = req.body || {};
-    const entry = {
-        receivedAt: new Date().toISOString(),
-        body
-    };
-
-    let key = makeKeyForParams(body);
-    if(!key && body.product && body.product.CartUID) key = `cart:${body.product.CartUID}`;
-    if(!key) key = `gen:${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-
-    paramsStore[key] = entry;
-    await saveStore();
-
-    console.log('Saved params for key', key);
-    res.json({ ok: true, key });
+app.post('/params', async (req) => {
+    console.log("PARAMS: ", req.body);
 });
 
 function findMatchingParams(payment){
@@ -92,7 +77,7 @@ app.post('/stars', async (req, res) => {
         delete paramsStore[match.key];
         await saveStore();
     } else {
-        console.log('Received order (no matching params):', JSON.stringify(body, null, 2));
+        // console.log('Received order (no matching params):', JSON.stringify(body, null, 2));
     }
 
     res.json({ ok: true });
