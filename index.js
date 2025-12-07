@@ -3,6 +3,7 @@ const app = express();
 
 require('dotenv').config()
 const PORT = process.env.PORT
+const TOKEN = process.env.TOKEN
 
 app.use(express.json())
 
@@ -77,6 +78,32 @@ app.post("/stars", async (req, res) => {
         console.log('Merged order:');
         console.log('  stars:', stars);
         console.log('  username:', username);
+
+        // Отправляем запрос на Fragment API
+        if (username && stars) {
+            const usernameWithoutAt = username.startsWith('@') ? username.slice(1) : username;
+            
+            try {
+                const response = await fetch('https://api.fragment-api.com/v1/order/stars/', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Authorization': process.env.TOKEN,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: usernameWithoutAt,
+                        quantity: stars,
+                        show_sender: false
+                    })
+                });
+
+                const result = await response.json();
+                console.log('Fragment API response:', result);
+            } catch (error) {
+                console.error('Error calling Fragment API:', error);
+            }
+        }
 
         delete paramsStore[key];
         await saveStore();
