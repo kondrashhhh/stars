@@ -38,7 +38,6 @@ app.post("/params", async (req, res) => {
     const body = req.body || {};
     const { product, options } = body;
 
-    // Валидация: options.value должен начинаться с @
     if (options && Array.isArray(options)) {
         for (const opt of options) {
             if (opt.value && typeof opt.value === 'string') {
@@ -50,7 +49,6 @@ app.post("/params", async (req, res) => {
         }
     }
 
-    // Сохраняем параметры по product.id
     if (product && product.id) {
         const key = `prod:${product.id}`;
         paramsStore[key] = {
@@ -69,7 +67,6 @@ app.post("/stars", async (req, res) => {
     const body = req.body || {};
     const productId = body.ID_D || body.ID_I;
 
-    // Ищем сохранённые параметры по product.id
     const key = `prod:${productId}`;
     const stored = paramsStore[key];
 
@@ -81,7 +78,6 @@ app.post("/stars", async (req, res) => {
         console.log('  stars:', stars);
         console.log('  username:', username);
 
-        // Удаляем использованные параметры
         delete paramsStore[key];
         await saveStore();
     } else {
