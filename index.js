@@ -7,11 +7,11 @@ const PORT = process.env.PORT
 app.use(express.json())
 
 app.post("/params", (req, res) => {
-    console.log('ПАРАМЕТРЫ', req);
+    console.log('ПАРАМЕТРЫ', req.body);
 })
 
 app.post("/stars", (req, res) => {
-    console.log('ЗАКАЗ', req);
+    console.log('ЗАКАЗ', req.body);
 })
 
 app.listen(PORT, () => {
