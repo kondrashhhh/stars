@@ -7,7 +7,8 @@ const PORT = process.env.PORT
 app.use(express.json())
 
 app.post("/params", (req, res) => {
-    console.log('ПАРАМЕТРЫ', req.body);
+    console.log('ПАРАМЕТРЫ', req);
+    res.send({"error": ""})
 })
 
 app.post("/stars", (req, res) => {
