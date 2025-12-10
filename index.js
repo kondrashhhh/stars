@@ -66,6 +66,54 @@ app.post("/params", async (req, res) => {
     res.json({ error: "" });
 })
 
+app.post('/code', async (req, res) => {
+    const body = req.body || {};
+    const uniqueCode = body.message || body.code || body.unique_code;
+
+    if (!uniqueCode) {
+        console.log('Error: no unique code provided');
+        return res.json({ ok: false, error: 'No code provided' });
+    }
+
+    console.log('Received unique code:', uniqueCode);
+
+    // Проверяем код в DigiSeller API
+    if (DIGISELLER_TOKEN) {
+        try {
+            const response = await fetch(
+                `https://api.digiseller.com/api/purchases/unique-code/${uniqueCode}?token=${DIGISELLER_TOKEN}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                }
+            );
+
+            const result = await response.json();
+
+            if (result.retval === 0) {
+                console.log('Code verification SUCCESS:');
+                console.log('  id_goods:', result.id_goods);
+                console.log('  amount:', result.amount);
+                console.log('  email:', result.email);
+                console.log('  options:', result.options);
+                console.log('  unique_code_state:', result.unique_code_state);
+                res.json({ ok: true, data: result });
+            } else {
+                console.log('Code verification FAILED:', result.retdesc);
+                res.json({ ok: false, error: result.retdesc });
+            }
+        } catch (error) {
+            console.error('Error verifying code:', error);
+            res.json({ ok: false, error: error.message });
+        }
+    } else {
+        console.log('Error: DIGISELLER_TOKEN not set');
+        res.json({ ok: false, error: 'Token not configured' });
+    }
+})
+
 app.post("/stars", async (req, res) => {
     const body = req.body || {};
     const productId = body.ID_D || body.ID_I;
@@ -108,7 +156,7 @@ app.post("/stars", async (req, res) => {
         }
 
         if (orderId && DIGISELLER_TOKEN) {
-            const messageText = `Отправьте уникальный код`;
+            const messageText = `Привет! Для получения звёзд тебе необходимо отправить следующим сообщением уникальный код (больше не отправляй сообщений, тг продавца: @fullstack_dev88). Ни в коем случае не добавляй никакие символы кроме кода, иначе звезды не будут отправлены!`;
 
             try {
                 const response = await fetch(
