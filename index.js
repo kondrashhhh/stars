@@ -15,6 +15,36 @@ const DATA_FILE = path.join(DATA_DIR, 'params.json');
 
 let paramsStore = {};
 
+async function getToken(sellerId, apiKey) {
+    const url = 'https://api.digiseller.ru/api/apilogin'
+    const timestamp = parseInt(Date.now() / 1000)
+    const sign = sha256.update('' + apiKey + timestamp).digest('hex');
+    const res = await axios({
+        method: 'post',
+        url,
+        data: {
+            "seller_id": sellerId,
+            "timestamp": timestamp,
+            "sign": sign
+        },
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    })
+    return {
+        status: res.status,
+        data: res.data
+    }
+}
+
+(async function () {
+    const sellerId = 1426165
+    const apiKey = "346E53DDF81D4A83A5B2EB02B4A6DA7D"
+    const res = await getToken(sellerId, apiKey)
+    console.log(res)
+})()
+
 async function loadStore(){
     try {
         const raw = await fs.readFile(DATA_FILE, 'utf8');
@@ -79,7 +109,6 @@ app.post("/stars", async (req, res) => {
         console.log('  stars:', stars);
         console.log('  username:', username);
 
-        // Отправляем запрос на Fragment API
         if (username && stars) {
             const usernameWithoutAt = username.startsWith('@') ? username.slice(1) : username;
             
