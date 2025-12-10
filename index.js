@@ -3,7 +3,6 @@ const app = express();
 
 const axios = require('axios')
 const crypto = require('crypto')
-const sha256 = crypto.createHash('sha256')
 
 require('dotenv').config()
 const PORT = process.env.PORT
@@ -22,7 +21,7 @@ let paramsStore = {};
 async function getToken(sellerId, apiKey) {
     const url = 'https://api.digiseller.ru/api/apilogin'
     const timestamp = parseInt(Date.now() / 1000)
-    const sign = sha256.update('' + apiKey + timestamp).digest('hex');
+    const sign = crypto.createHash('sha256').update('' + apiKey + timestamp).digest('hex');
     const res = await axios({
         method: 'post',
         url,
