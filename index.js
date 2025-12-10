@@ -1,6 +1,10 @@
 const express = require('express')
 const app = express();
 
+const axios = require('axios')
+const crypto = require('crypto')
+const sha256 = crypto.createHash('sha256')
+
 require('dotenv').config()
 const PORT = process.env.PORT
 const TOKEN = process.env.TOKEN
