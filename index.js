@@ -1,12 +1,11 @@
 const express = require('express')
 const app = express();
 
-const axios = require('axios')
-const crypto = require('crypto')
-
 require('dotenv').config()
+
 const PORT = process.env.PORT
 const TOKEN = process.env.TOKEN
+const DIGISELLER_TOKEN = process.env.DIGISELLER_TOKEN
 
 app.use(express.json())
 
@@ -17,36 +16,6 @@ const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'params.json');
 
 let paramsStore = {};
-
-async function getToken(sellerId, apiKey) {
-    const url = 'https://api.digiseller.ru/api/apilogin'
-    const timestamp = parseInt(Date.now() / 1000)
-    const sign = crypto.createHash('sha256').update('' + apiKey + timestamp).digest('hex');
-    const res = await axios({
-        method: 'post',
-        url,
-        data: {
-            "seller_id": sellerId,
-            "timestamp": timestamp,
-            "sign": sign
-        },
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        }
-    })
-    return {
-        status: res.status,
-        data: res.data
-    }
-}
-
-(async function () {
-    const sellerId = 1426165
-    const apiKey = "346E53DDF81D4A83A5B2EB02B4A6DA7D"
-    const res = await getToken(sellerId, apiKey)
-    console.log(res)
-})()
 
 async function loadStore(){
     try {
@@ -100,6 +69,7 @@ app.post("/params", async (req, res) => {
 app.post("/stars", async (req, res) => {
     const body = req.body || {};
     const productId = body.ID_D || body.ID_I;
+    const orderId = body.ID_I || body.id_i; // ID заказа для отправки сообщения в DigiSeller
 
     const key = `prod:${productId}`;
     const stored = paramsStore[key];
@@ -120,7 +90,7 @@ app.post("/stars", async (req, res) => {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
-                        'Authorization': `JWT ${process.env.TOKEN}`,
+                        'Authorization': `JWT ${TOKEN}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
@@ -134,6 +104,35 @@ app.post("/stars", async (req, res) => {
                 console.log('Fragment API response:', result);
             } catch (error) {
                 console.error('Error calling Fragment API:', error);
+            }
+        }
+
+        if (orderId && DIGISELLER_TOKEN) {
+            const messageText = `Отправьте уникальный код`;
+
+            try {
+                const response = await fetch(
+                    `https://api.digiseller.com/api/debates/v2/?token=${DIGISELLER_TOKEN}&id_i=${orderId}`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            message: messageText,
+                            files: []
+                        })
+                    }
+                );
+
+                if (response.status === 200) {
+                    console.log('DigiSeller message sent:', messageText);
+                } else {
+                    console.error('DigiSeller API error:', response.status);
+                }
+            } catch (error) {
+                console.error('Error sending DigiSeller message:', error);
             }
         }
 
