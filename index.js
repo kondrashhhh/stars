@@ -70,12 +70,12 @@ app.post('/code', async (req, res) => {
     const body = req.body || {};
     const uniqueCode = body.message || body.code || body.unique_code;
 
-    if (!uniqueCode) {
-        console.log('Error: no unique code provided');
-        return res.json({ ok: false, error: 'No code provided' });
-    }
+    // if (!uniqueCode) {
+    //     console.log('Error: no unique code provided');
+    //     return res.json({ ok: false, error: 'No code provided' });
+    // }
 
-    console.log('Received unique code:', uniqueCode);
+    console.log('Received unique code:', body);
 
     // Проверяем код в DigiSeller API
     if (DIGISELLER_TOKEN) {
