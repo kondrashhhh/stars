@@ -68,49 +68,111 @@ app.post("/params", async (req, res) => {
 
 app.post('/code', async (req, res) => {
     const body = req.body || {};
-    const uniqueCode = body.message || body.code || body.unique_code;
+    const uniqueCode = body.Message || body.message;
 
-    // if (!uniqueCode) {
-    //     console.log('Error: no unique code provided');
-    //     return res.json({ ok: false, error: 'No code provided' });
-    // }
+    if (!uniqueCode) {
+        console.log('Error: no unique code provided');
+        return res.json({ ok: false, error: 'No code provided' });
+    }
 
-    console.log('Received unique code:', body);
+    console.log('Received unique code:', uniqueCode);
 
     // Проверяем код в DigiSeller API
-    if (DIGISELLER_TOKEN) {
+    if (!DIGISELLER_TOKEN) {
+        console.log('Error: DIGISELLER_TOKEN not set');
+        return res.json({ ok: false, error: 'Token not configured' });
+    }
+
+    try {
+        // ШАГИ 1: Проверяем код
+        const verifyResponse = await fetch(
+            `https://api.digiseller.com/api/purchases/unique-code/${uniqueCode}?token=${DIGISELLER_TOKEN}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+        const verifyResult = await verifyResponse.json();
+
+        if (verifyResult.retval !== 0) {
+            console.log('Code verification FAILED:', verifyResult.retdesc);
+            return res.json({ ok: false, error: verifyResult.retdesc });
+        }
+
+        // КОД ПРОШЕЛ ПРОВЕРКУ!
+        console.log('Code verification SUCCESS:');
+        console.log('  id_goods:', verifyResult.id_goods);
+        console.log('  inv:', verifyResult.inv);
+        console.log('  unique_code_state:', verifyResult.unique_code_state);
+
+        // ШАГИ 2: Отправляем звезды через Fragment API
+        const key = `prod:${verifyResult.id_goods}`;
+        const stored = paramsStore[key];
+
+        if (stored) {
+            const stars = stored.product.cnt;
+            const username = stored.options && stored.options[0] ? stored.options[0].value : '';
+
+            if (username && stars) {
+                const usernameWithoutAt = username.startsWith('@') ? username.slice(1) : username;
+                
+                try {
+                    const fragmentResponse = await fetch('https://api.fragment-api.com/v1/order/stars/', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Authorization': `JWT ${TOKEN}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            username: usernameWithoutAt,
+                            quantity: stars,
+                            show_sender: false
+                        })
+                    });
+
+                    const fragmentResult = await fragmentResponse.json();
+                    console.log('Fragment API response (stars sent):', fragmentResult);
+                } catch (error) {
+                    console.error('Error calling Fragment API:', error);
+                }
+            }
+
+            delete paramsStore[key];
+            await saveStore();
+        }
+
+        // ШАГИ 3: Отправляем PUT запрос для изменения статуса "товар доставлен"
         try {
-            const response = await fetch(
-                `https://api.digiseller.com/api/purchases/unique-code/${uniqueCode}?token=${DIGISELLER_TOKEN}`,
+            const deliverResponse = await fetch(
+                `https://api.digiseller.com/api/purchases/unique-code/${uniqueCode}/deliver?token=${DIGISELLER_TOKEN}`,
                 {
-                    method: 'GET',
+                    method: 'PUT',
                     headers: {
                         'Accept': 'application/json'
                     }
                 }
             );
 
-            const result = await response.json();
+            const deliverResult = await deliverResponse.json();
 
-            if (result.retval === 0) {
-                console.log('Code verification SUCCESS:');
-                console.log('  id_goods:', result.id_goods);
-                console.log('  amount:', result.amount);
-                console.log('  email:', result.email);
-                console.log('  options:', result.options);
-                console.log('  unique_code_state:', result.unique_code_state);
-                res.json({ ok: true, data: result });
+            if (deliverResult.retval === 0) {
+                console.log('Delivery status updated to "delivered"');
+                console.log('  new state:', deliverResult.unique_code_state);
             } else {
-                console.log('Code verification FAILED:', result.retdesc);
-                res.json({ ok: false, error: result.retdesc });
+                console.log('Failed to update delivery status:', deliverResult.retdesc);
             }
         } catch (error) {
-            console.error('Error verifying code:', error);
-            res.json({ ok: false, error: error.message });
+            console.error('Error updating delivery status:', error);
         }
-    } else {
-        console.log('Error: DIGISELLER_TOKEN not set');
-        res.json({ ok: false, error: 'Token not configured' });
+
+        res.json({ ok: true, data: verifyResult });
+    } catch (error) {
+        console.error('Error processing code:', error);
+        res.json({ ok: false, error: error.message });
     }
 })
 
