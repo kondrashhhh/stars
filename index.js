@@ -112,6 +112,8 @@ app.post('/code', async (req, res) => {
         const key = `prod:${verifyResult.id_goods}`;
         const stored = paramsStore[key];
 
+        let fragmentSuccess = false;
+
         if (stored) {
             const stars = stored.product.cnt;
             const username = stored.options && stored.options[0] ? stored.options[0].value : '';
@@ -136,37 +138,47 @@ app.post('/code', async (req, res) => {
 
                     const fragmentResult = await fragmentResponse.json();
                     console.log('Fragment API response (stars sent):', fragmentResult);
+                    
+                    if (fragmentResult.success) {
+                        fragmentSuccess = true;
+                        console.log('Stars sent successfully to @' + usernameWithoutAt);
+                    }
                 } catch (error) {
                     console.error('Error calling Fragment API:', error);
                 }
             }
-
-            delete paramsStore[key];
-            await saveStore();
         }
 
-        // ШАГИ 3: Отправляем PUT запрос для изменения статуса "товар доставлен"
-        try {
-            const deliverResponse = await fetch(
-                `https://api.digiseller.com/api/purchases/unique-code/${uniqueCode}/deliver?token=${DIGISELLER_TOKEN}`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Accept': 'application/json'
+        // ШАГИ 3: Меняем статус ТОЛЬКО если звезды успешно отправлены
+        if (fragmentSuccess) {
+            try {
+                const deliverResponse = await fetch(
+                    `https://api.digiseller.com/api/purchases/unique-code/${uniqueCode}/deliver?token=${DIGISELLER_TOKEN}`,
+                    {
+                        method: 'PUT',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
                     }
+                );
+
+                const deliverResult = await deliverResponse.json();
+
+                if (deliverResult.retval === 0) {
+                    console.log('Delivery status updated to "delivered"');
+                    console.log('  new state:', deliverResult.unique_code_state);
+                    
+                    // Удаляем параметры ТОЛЬКО после успеха
+                    delete paramsStore[key];
+                    await saveStore();
+                } else {
+                    console.log('Failed to update delivery status:', deliverResult.retdesc);
                 }
-            );
-
-            const deliverResult = await deliverResponse.json();
-
-            if (deliverResult.retval === 0) {
-                console.log('Delivery status updated to "delivered"');
-                console.log('  new state:', deliverResult.unique_code_state);
-            } else {
-                console.log('Failed to update delivery status:', deliverResult.retdesc);
+            } catch (error) {
+                console.error('Error updating delivery status:', error);
             }
-        } catch (error) {
-            console.error('Error updating delivery status:', error);
+        } else {
+            console.log('Skipping delivery status update - stars not sent');
         }
 
         res.json({ ok: true, data: verifyResult });
@@ -191,31 +203,7 @@ app.post("/stars", async (req, res) => {
         console.log('Merged order:');
         console.log('  stars:', stars);
         console.log('  username:', username);
-
-        if (username && stars) {
-            const usernameWithoutAt = username.startsWith('@') ? username.slice(1) : username;
-            
-            try {
-                const response = await fetch('https://api.fragment-api.com/v1/order/stars/', {
-                    method: 'POST',
-                    headers: {
-                        'Accept': 'application/json',
-                        'Authorization': `JWT ${TOKEN}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        username: usernameWithoutAt,
-                        quantity: stars,
-                        show_sender: false
-                    })
-                });
-
-                const result = await response.json();
-                console.log('Fragment API response:', result);
-            } catch (error) {
-                console.error('Error calling Fragment API:', error);
-            }
-        }
+        console.log('  Waiting for code verification before sending stars...');
 
         if (orderId && DIGISELLER_TOKEN) {
             const messageText = `Привет! Для получения звёзд тебе необходимо отправить следующим сообщением уникальный код (больше не отправляй сообщений, тг продавца: @fullstack_dev88). Ни в коем случае не добавляй никакие символы кроме кода, иначе звезды не будут отправлены!`;
@@ -245,9 +233,6 @@ app.post("/stars", async (req, res) => {
                 console.error('Error sending DigiSeller message:', error);
             }
         }
-
-        delete paramsStore[key];
-        await saveStore();
     } else {
         console.log('Order received (no matching params):', body);
     }
